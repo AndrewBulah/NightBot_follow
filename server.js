@@ -36,6 +36,7 @@ function generateFollowMessage(months, days) {
 
 async function getToken() {
   try {
+    console.log('Запрос токена с CLIENT_ID:', process.env.CLIENT_ID); // Логируем CLIENT_ID
     const response = await axios.post(
       'https://id.twitch.tv/oauth2/token',
       null,
@@ -44,9 +45,10 @@ async function getToken() {
           client_id: CLIENT_ID, 
           client_secret: CLIENT_SECRET,
           grant_type: 'client_credentials' 
-        }
+        } 
       }
     );
+    console.log('Токен получен:', response.data.access_token); // Логируем токен
     return response.data.access_token;
   } catch (error) {
     console.error('Ошибка получения токена:', error.response?.data);
@@ -57,6 +59,7 @@ async function getToken() {
 async function getUserId(login) {
   try {
     const token = await getToken();
+    console.log('Запрос ID для логина:', login); // Логируем логин
     const response = await axios.get('https://api.twitch.tv/helix/users', {
       params: { login: login.toLowerCase() },
       headers: { 
@@ -64,13 +67,8 @@ async function getUserId(login) {
         'Authorization': `Bearer ${token}` 
       }
     });
-
-    if (!response.data?.data?.length) {
-      console.error('Пользователь не найден:', login);
-      return null;
-    }
-
-    return response.data.data[0].id;
+    console.log('Ответ от Twitch (getUserId):', response.data); // Логируем ответ
+    return response.data.data[0]?.id;
   } catch (error) {
     console.error('Ошибка получения ID:', error.response?.data || error.message);
     return null;
