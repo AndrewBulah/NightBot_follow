@@ -2,45 +2,96 @@ const express = require('express');
 const axios = require('axios');
 const app = express();
 
-// Конфиг из переменных окружения Render.com
+// Конфиг из переменных окружения
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
-const CHANNEL = process.env.CHANNEL; // Например: ninja
+const CHANNEL = process.env.CHANNEL.toLowerCase(); // Логин всегда в lowercase
 
-// Получаем токен Twitch
+// Получаем токен Twitch с обработкой ошибок
 async function getToken() {
-  const response = await axios.post(`https://id.twitch.tv/oauth2/token?client_id=${CLIENT_ID}&client_secret=${CLIENT_SECRET}&grant_type=client_credentials`);
-  return response.data.access_token;
+  try {
+    const response = await axios.post(
+      `https://id.twitch.tv/oauth2/token`,
+      null,
+      {
+        params: {
+          client_id: CLIENT_ID,
+          client_secret: CLIENT_SECRET,
+          grant_type: 'client_credentials'
+        }
+      }
+    );
+    return response.data.access_token;
+  } catch (error) {
+    console.error('Ошибка получения токена:', error.response?.data);
+    throw error;
+  }
 }
 
-// Проверяем followage
-app.get('/followage', async (req, res) => {
-  const user = req.query.user;
-  const token = await getToken();
-
+// Конвертируем логин в ID пользователя
+async function getUserId(login) {
   try {
-    const response = await axios.get(`https://api.twitch.tv/helix/users/follows?from_id=${user}&to_id=${CHANNEL}`, {
+    const token = await getToken();
+    const response = await axios.get('https://api.twitch.tv/helix/users', {
+      params: { login },
+      headers: {
+        'Client-ID': CLIENT_ID,
+        'Authorization': `Bearer ${token}`
+      }
+    });
+    return response.data.data[0]?.id;
+  } catch (error) {
+    console.error('Ошибка получения ID:', error);
+    return null;
+  }
+}
+
+app.get('/followage', async (req, res) => {
+  try {
+    const userLogin = req.query.user?.trim();
+    if (!userLogin) return res.status(400).send('Укажите параметр ?user=ник');
+
+    // Получаем ID пользователя и канала
+    const [userId, channelId] = await Promise.all([
+      getUserId(userLogin),
+      getUserId(CHANNEL)
+    ]);
+
+    if (!userId || !channelId) {
+      return res.status(404).send('Пользователь не найден');
+    }
+
+    // Запрос данных о фолловере
+    const token = await getToken();
+    const response = await axios.get('https://api.twitch.tv/helix/users/follows', {
+      params: {
+        from_id: userId,
+        to_id: channelId
+      },
       headers: {
         'Client-ID': CLIENT_ID,
         'Authorization': `Bearer ${token}`
       }
     });
 
-    if (response.data.data.length === 0) {
-      return res.send(`${user} не подписан на канал.`);
+    // Обработка результата
+    if (!response.data.data.length) {
+      return res.send(`${userLogin} не подписан на канал.`);
     }
 
     const followDate = new Date(response.data.data[0].followed_at);
-    const diff = Date.now() - followDate;
+    const now = new Date();
+    const diff = now - followDate;
+    
     const years = Math.floor(diff / (1000 * 60 * 60 * 24 * 365));
     const months = Math.floor((diff % (1000 * 60 * 60 * 24 * 365)) / (1000 * 60 * 60 * 24 * 30));
 
-    res.send(`${user} фолловит канал уже ${years} лет и ${months} месяцев.`);
+    res.send(`${userLogin} фолловит канал уже ${years} лет и ${months} месяцев.`);
   } catch (error) {
-    res.send('Ошибка :(');
+    console.error('Ошибка:', error.response?.data || error.message);
+    res.status(500).send('Ошибка сервера');
   }
 });
 
-// Порт для Render.com
 const port = process.env.PORT || 3000;
 app.listen(port, () => console.log(`Server started on port ${port}`));
