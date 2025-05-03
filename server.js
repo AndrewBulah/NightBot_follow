@@ -56,7 +56,7 @@ app.get('/followage', async (req, res) => {
 
     const token = await getToken();
     const response = await axios.get('https://api.twitch.tv/helix/users/follows', {
-      params: { from_id: userId, to_id: channelId },
+      params: { login: login.toLowerCase() },
       headers: { 'Client-ID': CLIENT_ID, 'Authorization': `Bearer ${token}` }
     });
 
