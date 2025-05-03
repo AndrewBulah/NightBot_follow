@@ -36,7 +36,7 @@ function generateFollowMessage(months, days) {
 
 async function getToken() {
   try {
-    console.log('Запрос токена с CLIENT_ID:', process.env.CLIENT_ID); // Логируем CLIENT_ID
+    console.log('Запрос токена с CLIENT_ID:', process.env.CLIENT_ID);
     const response = await axios.post(
       'https://id.twitch.tv/oauth2/token',
       null,
@@ -48,7 +48,7 @@ async function getToken() {
         } 
       }
     );
-    console.log('Токен получен:', response.data.access_token); // Логируем токен
+    console.log('Токен получен:', response.data.access_token);
     return response.data.access_token;
   } catch (error) {
     console.error('Ошибка получения токена:', error.response?.data);
@@ -59,7 +59,7 @@ async function getToken() {
 async function getUserId(login) {
   try {
     const token = await getToken();
-    console.log('Запрос ID для логина:', login); // Логируем логин
+    console.log('Запрос ID для логина:', login);
     const response = await axios.get('https://api.twitch.tv/helix/users', {
       params: { login: login.toLowerCase() },
       headers: { 
@@ -67,7 +67,7 @@ async function getUserId(login) {
         'Authorization': `Bearer ${token}` 
       }
     });
-    console.log('Ответ от Twitch (getUserId):', response.data); // Логируем ответ
+    console.log('Ответ от Twitch (getUserId):', response.data);
     return response.data.data[0]?.id;
   } catch (error) {
     console.error('Ошибка получения ID:', error.response?.data || error.message);
@@ -90,10 +90,11 @@ app.get('/followage', async (req, res) => {
     }
 
     const token = await getToken();
-    const response = await axios.get('https://api.twitch.tv/helix/users/follows', {
+    // Исправленный эндпоинт и параметры
+    const response = await axios.get('https://api.twitch.tv/helix/channels/followers', {
       params: { 
-        from_id: userId,  // Используем ID вместо логина
-        to_id: channelId 
+        broadcaster_id: channelId,  // Новый параметр
+        user_id: userId            // Новый параметр
       },
       headers: { 
         'Client-ID': CLIENT_ID, 
